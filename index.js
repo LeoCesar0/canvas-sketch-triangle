@@ -4,59 +4,25 @@ const random = require("canvas-sketch-util/random");
 const Color = require("canvas-sketch-util/color");
 const risoColors = require("riso-colors");
 
+const seed = random.getRandomSeed();
+random.setSeed(seed);
+
 const settings = {
   dimensions: [1080, 1080],
-  // animate: true,
+  animate: true,
   fps: 60,
+  name: seed,
 };
 
+const colors = [random.pick(risoColors), random.pick(risoColors)];
+const bgColor = random.pick(colors).hex;
+
 const sketch = ({ context, width, height }) => {
-  const colors = [random.pick(risoColors), random.pick(risoColors)];
-  const bgColor = random.pick(colors).hex;
   let i = 0;
 
-  context.fillStyle = bgColor;
-  context.fillRect(0, 0, width, height);
-
   // --------------------------
-  // RECT CONFIG
+  // TRIANGLE MASK
   // --------------------------
-  const angle = -30;
-  let x = 200;
-  let y = 200;
-
-  const numOfRects = 50;
-
-  const maxWidth = width * 0.8;
-  const minWidth = 600;
-  const maxHeight = 120;
-  const minHeight = 50;
-
-  let lastCoords = null;
-
-  const rects = new Array(numOfRects).fill().map((item) => {
-    const fill = random.pick(colors).hex;
-    const stroke = random.pick(colors).hex;
-    const blend = random.value() > 0.4 ? "overlay" : "source-over";
-    const rectOffset = 100;
-
-    let w = random.range(minWidth, maxWidth);
-    let h = random.range(minHeight, maxHeight);
-    let x = random.range(-600, width);
-    let y = random.range(100, height + 200);
-
-    lastCoords = { x, y };
-
-    return {
-      x: x,
-      y: y,
-      w: w,
-      h: h,
-      fill: fill,
-      stroke: stroke,
-      blend: blend,
-    };
-  });
 
   const mask = {
     x: width / 2,
@@ -67,7 +33,38 @@ const sketch = ({ context, width, height }) => {
     lineWidth: 20,
   };
 
-  return ({ context, width, height }) => {
+  // --------------------------
+  // RECT CONFIG
+  // --------------------------
+  const numOfRects = 100;
+  const rects = new Array(numOfRects)
+    .fill()
+    .map(() => getRandomRect({ width, height, mask }));
+  const deg = -45;
+  const rad = math.degToRad(deg);
+
+  // --------------------------
+  // Write Seed
+  // --------------------------
+
+  context.save();
+
+  context.fillStyle = "white";
+  context.fillRect(8, 8, 150, 55);
+
+  context.font = "48px serif";
+  context.fillStyle = "black";
+  context.fillText(seed, 10, 50);
+
+  context.restore();
+
+  // --------------------------
+  //
+  // --------------------------
+
+  return ({ context, width, height, frame }) => {
+    context.fillStyle = bgColor;
+    context.fillRect(0, 0, width, height);
     // --------------------------
     // DRAW TRIANGLE MASK
     // --------------------------
@@ -87,8 +84,22 @@ const sketch = ({ context, width, height }) => {
     // SKEWED RECT
     // --------------------------
 
-    rects.forEach((rect) => {
-      const { x, y, w, h, fill, stroke, blend } = rect;
+    rects.forEach((rect, index) => {
+      const movement = Math.cos(rad) * rect.rectSpeed;
+
+      rect.x = rect.x - movement;
+      rect.y = rect.y + movement;
+
+      const xOffset = -rect.w;
+
+      if (rect.x <= xOffset) {
+        const newRect = getRandomRect({ width, height, mask });
+        rects.splice(index, 1, newRect);
+      }
+    });
+
+    rects.forEach((rect, index) => {
+      let { x, y, w, h, fill, stroke, blend } = rect;
 
       const shadowColor = Color.offsetHSL(fill, 0, 0, -20);
 
@@ -105,7 +116,7 @@ const sketch = ({ context, width, height }) => {
       drawSkewedRect({
         width: w,
         height: h,
-        deg: angle,
+        deg: deg,
         context: context,
       });
 
@@ -139,10 +150,10 @@ const sketch = ({ context, width, height }) => {
     context.strokeStyle = "rgba(0,0,0,0.6)";
     context.stroke();
 
-    context.strokeStyle = "rgba(0,0,0,0.4)";
-    context.lineWidth = mask.lineWidth / 2;
-    drawPolygon({ context, radius: mask.radius / 2, sides: mask.sides });
-    context.stroke();
+    // context.strokeStyle = "rgba(0,0,0,0.4)";
+    // context.lineWidth = mask.lineWidth / 2;
+    // drawPolygon({ context, radius: mask.radius / 2, sides: mask.sides });
+    // context.stroke();
 
     context.restore();
 
@@ -191,4 +202,39 @@ const drawPolygon = ({ context, radius = 100, sides = 3 }) => {
   }
 
   context.closePath();
+};
+
+const getRandomRect = ({ width, height, mask }) => {
+  // const maxWidth = width * 0.8;
+  const maxWidth = width * 0.25;
+  const minWidth = 600;
+  const maxHeight = 120;
+  const minHeight = 50;
+  const minSpeed = 2;
+  const maxSpeed = 5;
+
+  const fill = random.pick(colors).hex;
+  const stroke = random.pick(colors).hex;
+  const blend = random.value() > 0.4 ? "overlay" : "source-over";
+
+  let w = random.range(minWidth, maxWidth);
+  let h = random.range(minHeight, maxHeight);
+
+  // let x = random.range(-600, width);
+  // let y = random.range(100, height + 200);
+  let x = width/2 + mask.radius/2
+  let y = random.range(-100, height);
+
+  const rectSpeed = random.range(minSpeed, maxSpeed);
+
+  return {
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    fill: fill,
+    stroke: stroke,
+    blend: blend,
+    rectSpeed,
+  };
 };
